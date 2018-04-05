@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<widget id="com.qbix.qbixcontactgrouplib" version="1.0.0">
+    <name>QbixContactGroup</name>
+    <description>
+        Plugin for Apache Cordova Aplications to managing contact groups.
+    </description>
+    <author email="dev@callback.apache.org" href="http://cordova.io">
+        Apache Cordova Team
+    </author>
+    <content src="index.html" />
+    <access origin="*" />
+</widget>
