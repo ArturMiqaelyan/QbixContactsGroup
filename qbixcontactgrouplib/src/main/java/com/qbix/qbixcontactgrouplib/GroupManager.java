@@ -8,6 +8,7 @@ import org.apache.cordova.PermissionHelper;
 import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -17,19 +18,26 @@ import java.util.List;
 
 public class GroupManager extends CordovaPlugin {
 
+    //Actions
     private final String GET_ALL_LABELS_ACTION = "getAll";
+    private final String REMOVE_CONTACT_FROM_LABEL_ACTION = "removeContact";
+    private final String ADD_CONTACT_TO_LABEL_ACTION = "addContact";
 
     private final String READ = Manifest.permission.READ_CONTACTS;
     private final String WRITE = Manifest.permission.WRITE_CONTACTS;
 
     //Request code for the permissions picker (Pick is async and uses intents)
     private final int ALL_LABELS_REQ_CODE = 8;
+    private final int REMOVE_CONTACT_FROM_LABEL_REQ_CODE = 9;
+    private final int ADD_CONTACT_TO_LABEL_REQ_CODE = 10;
 
     //Error codes for returning with error plugin result
-    private final int UNKNOWN_ERROR = 0;
-    private final int NOT_SUPPORTED_ERROR = 1;
-    private final int PERMISSION_DENIED_ERROR = 2;
+    protected static final String UNKNOWN_ERROR = "unknown error";
+    protected static final String SUCCESS = "success";
+    protected static final String NOT_SUPPORTED_ERROR = "not supported error";
+    protected static final String PERMISSION_DENIED_ERROR = "permission denied error";
 
+    private JSONArray executeArgs;
     private GroupAccessor groupAccessor;
     private CallbackContext callbackContext;   // The callback context from which we were invoked.
 
@@ -50,13 +58,15 @@ public class GroupManager extends CordovaPlugin {
     /**
      * Executes the request and returns PluginResult.
      *
-     * @param action            The action to execute.
-     * @param args              JSONArray of arguments for the plugin.
-     * @param callbackContext   The callback context used when calling back into JavaScript.
-     * @return                  True if the action was valid, false otherwise.
+     * @param action          The action to execute.
+     * @param args            JSONArray of arguments for the plugin.
+     * @param callbackContext The callback context used when calling back into JavaScript.
+     * @return True if the action was valid, false otherwise.
      */
-    public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
+    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
 
+        this.callbackContext = callbackContext;
+        this.executeArgs = args;
         /**
          * Check to see if we are on an Android 1.X device.  If we are return an error as we
          * do not support this as of Cordova 1.0.
@@ -82,6 +92,38 @@ public class GroupManager extends CordovaPlugin {
             }
 
             return true;
+        } else if (action.equals(REMOVE_CONTACT_FROM_LABEL_ACTION)) {
+            if (PermissionHelper.hasPermission(this, WRITE)) {
+                this.cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        try {
+                            removeContactFromLabel(executeArgs);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+                        }
+                    }
+                });
+            } else {
+                getWritePermission(REMOVE_CONTACT_FROM_LABEL_REQ_CODE);
+            }
+            return true;
+        }else if(action.equals(ADD_CONTACT_TO_LABEL_ACTION)){
+            if(PermissionHelper.hasPermission(this, WRITE)){
+                this.cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        try {
+                            addContactToLabel(executeArgs);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+                        }
+                    }
+                });
+            }else {
+                getWritePermission(ADD_CONTACT_TO_LABEL_REQ_CODE);
+            }
+            return true;
         }
         return false;
     }
@@ -90,9 +132,8 @@ public class GroupManager extends CordovaPlugin {
      * Gets all labels asynchronously and set result to callback context's as success.
      * It may get empty list if there are no visible labels or all are visible ones are marked as
      * deleted.
-     * @throws JSONException
      */
-    private void getLabels() throws JSONException {
+    private void getLabels() {
         this.cordova.getThreadPool().execute(new Runnable() {
             public void run() {
                 List<QbixGroup> labels = groupAccessor.getAllLabels(this.cordova);
@@ -105,8 +146,62 @@ public class GroupManager extends CordovaPlugin {
         });
     }
 
+    /**
+     * Removes contacts from given label
+     *
+     * @param args Arguments from {@link #execute(String, JSONArray, CallbackContext)} method
+     */
+    private void removeContactFromLabel(JSONArray args) {
+        try {
+            final JSONObject filter = args.getJSONObject(0);
+            final String labelId = filter.getString("labelId");
+            final JSONArray contactIds = filter.getJSONArray("contactIds");
+            String[] idArray = new String[contactIds.length()];
+            for (int i = 0; i < contactIds.length(); i++) {
+                JSONObject row = contactIds.getJSONObject(i);
+                idArray[i] = row.getString("contactId");
+            }
+            String removeMessage = groupAccessor.removeLabelFromContacts(labelId, idArray);
+            if (removeMessage.equals(SUCCESS)) {
+                callbackContext.success();
+            } else {
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, removeMessage));
+            }
+        } catch (JSONException e) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+        }
+    }
+
+    /**
+     * Adds label to given contacts
+     *
+     * @param args Arguments from {@link #execute(String, JSONArray, CallbackContext)} method
+     */
+    private void addContactToLabel(JSONArray args) {
+        try {
+            final JSONObject filter = args.getJSONObject(0);
+            final String labelId = filter.getString("labelId");
+            final JSONArray contactIds = filter.getJSONArray("contactIds");
+            String[] idArray = new String[contactIds.length()];
+            for (int i = 0; i < contactIds.length(); i++) {
+                JSONObject row = contactIds.getJSONObject(i);
+                idArray[i] = row.getString("contactId");
+            }
+            String addMessage = groupAccessor.addLabelToContacts(labelId, idArray);
+            if (addMessage.equals(SUCCESS)) {
+                callbackContext.success();
+            } else if(addMessage.equals(UNKNOWN_ERROR)){
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, addMessage));
+            }else {
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, addMessage));
+            }
+        } catch (JSONException e) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+        }
+    }
+
     public void onRequestPermissionResult(int requestCode, String[] permissions,
-                                          int[] grantResults) throws JSONException {
+                                          int[] grantResults) {
         for (int r : grantResults) {
             if (r == PackageManager.PERMISSION_DENIED) {
                 this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
@@ -116,6 +211,18 @@ public class GroupManager extends CordovaPlugin {
         switch (requestCode) {
             case ALL_LABELS_REQ_CODE:
                 getLabels();
+                break;
+            case REMOVE_CONTACT_FROM_LABEL_REQ_CODE:
+                this.cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        try {
+                            removeContactFromLabel(executeArgs);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+                        }
+                    }
+                });
                 break;
         }
     }
