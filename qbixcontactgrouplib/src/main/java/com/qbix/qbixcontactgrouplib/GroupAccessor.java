@@ -41,6 +41,7 @@ public class GroupAccessor {
         Cursor cursor = app.getActivity().getContentResolver().query(
                 ContactsContract.Groups.CONTENT_SUMMARY_URI,
                 new String[]{
+                        ContactsContract.Groups._ID,
                         ContactsContract.Groups.SOURCE_ID,
                         ContactsContract.Groups.NOTES,
                         ContactsContract.Groups.SUMMARY_COUNT,
@@ -55,7 +56,8 @@ public class GroupAccessor {
         List<String> sourceIds = new ArrayList<>();
         while (cursor.moveToNext()) {
             QbixGroup group = new QbixGroup();
-            group.id = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID));
+            group.id = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID));
+            group.sourceId = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID));
             group.notes = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.NOTES));
             group.summaryCount = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.SUMMARY_COUNT));
             group.isVisible = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.GROUP_VISIBLE)) == 0;

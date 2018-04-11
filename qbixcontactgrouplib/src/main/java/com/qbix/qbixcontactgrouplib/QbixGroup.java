@@ -2,7 +2,8 @@ package com.qbix.qbixcontactgrouplib;
 
 public class QbixGroup {
 
-    String id;    //The source id
+    String id;
+    String sourceId;
     String notes;
     int summaryCount;
     boolean isVisible;
