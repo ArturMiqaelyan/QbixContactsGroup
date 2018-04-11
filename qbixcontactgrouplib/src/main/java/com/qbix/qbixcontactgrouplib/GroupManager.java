@@ -22,14 +22,17 @@ public class GroupManager extends CordovaPlugin {
     private final String GET_ALL_LABELS_ACTION = "getAll";
     private final String REMOVE_CONTACT_FROM_LABEL_ACTION = "removeContact";
     private final String ADD_CONTACT_TO_LABEL_ACTION = "addContact";
+    private final String REMOVE_LABEL_ACTION = "remove";
 
     private final String READ = Manifest.permission.READ_CONTACTS;
     private final String WRITE = Manifest.permission.WRITE_CONTACTS;
+    private final String ACCOUNTS = Manifest.permission.GET_ACCOUNTS;
 
     //Request code for the permissions picker (Pick is async and uses intents)
     private final int ALL_LABELS_REQ_CODE = 8;
     private final int REMOVE_CONTACT_FROM_LABEL_REQ_CODE = 9;
     private final int ADD_CONTACT_TO_LABEL_REQ_CODE = 10;
+    private final int REMOVE_LABEL_REQ_CODE = 11;
 
     //Error codes for returning with error plugin result
     protected static final String UNKNOWN_ERROR = "unknown error";
@@ -53,6 +56,10 @@ public class GroupManager extends CordovaPlugin {
 
     private void getWritePermission(int requestCode) {
         PermissionHelper.requestPermission(this, requestCode, WRITE);
+    }
+
+    private void getAccountPermission(int requestCode) {
+        PermissionHelper.requestPermission(this, requestCode, ACCOUNTS);
     }
 
     /**
@@ -124,6 +131,13 @@ public class GroupManager extends CordovaPlugin {
                 getWritePermission(ADD_CONTACT_TO_LABEL_REQ_CODE);
             }
             return true;
+        }else if(action.equals(REMOVE_LABEL_ACTION)){
+            if(PermissionHelper.hasPermission(this, ACCOUNTS)){
+
+            }else {
+               getAccountPermission(REMOVE_LABEL_REQ_CODE);
+            }
+            return true;
         }
         return false;
     }
@@ -193,7 +207,7 @@ public class GroupManager extends CordovaPlugin {
             } else if(addMessage.equals(UNKNOWN_ERROR)){
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, addMessage));
             }else {
-                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, addMessage));
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, addMessage));
             }
         } catch (JSONException e) {
             callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
@@ -223,6 +237,9 @@ public class GroupManager extends CordovaPlugin {
                         }
                     }
                 });
+                break;
+            case REMOVE_LABEL_REQ_CODE:
+
                 break;
         }
     }

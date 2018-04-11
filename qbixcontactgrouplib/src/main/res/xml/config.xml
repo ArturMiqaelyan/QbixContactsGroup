@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<widget id="com.qbix.qbixcontactgrouplib" version="1.0.0">
+<widget id="com.qbix.qbixcontactgrouplib"
+    version="1.0.0"
+    xmlns:android="http://schemas.android.com/apk/res/android">
     <name>QbixContactGroup</name>
     <description>
         Plugin for Apache Cordova Aplications to managing contact groups.
@@ -9,4 +11,12 @@
     </author>
     <content src="index.html" />
     <access origin="*" />
+
+    <config-file target="AndroidManifest.xml" parent="/*">
+        <uses-permission android:name="android.permission.READ_CONTACTS" />
+        <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+        <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+        <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    </config-file>
+
 </widget>
