@@ -155,8 +155,13 @@ public class GroupManager extends CordovaPlugin {
         this.cordova.getThreadPool().execute(new Runnable() {
             public void run() {
                 List<QbixGroup> labels = groupAccessor.getAllLabels(this.cordova);
+                JSONArray jsonGroups = new JSONArray();
+                for (QbixGroup group :
+                        labels) {
+                    jsonGroups.put(group.toJson());
+                }
                 if (labels != null) {
-                    callbackContext.success(labels);
+                    callbackContext.success(jsonGroups);
                 } else {
                     callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, UNKNOWN_ERROR));
                 }

@@ -60,7 +60,7 @@ public class GroupAccessor {
                 null,
                 null);
         List<String> sourceIds = new ArrayList<>();
-        HashMap<String, String> existingLabels = getExistingRawIdLabelIdPairs();
+        List<RawIdLabelId> rawIdLabelIds = getExistingRawIdLabelIdPairs();
         HashMap<String, String> rawIdContactIdPair = getExistingRawIdContactIdPairs();
         while (cursor.moveToNext()) {
             QbixGroup group = new QbixGroup();
@@ -82,20 +82,21 @@ public class GroupAccessor {
             Log.i("group_info_checker", "deleted: " + group.isDeleted);
             Log.i("group_info_checker", "should_sync: " + group.shouldSync);
             Log.i("group_info_checker", "read_only: " + group.readOnly);
-            List<Integer> rawContactIds = getKeysByValue(existingLabels, cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID)));
-            List<Integer> contactIds = new ArrayList<>();
-            for (int i = 0; i < rawContactIds.size(); i++) {
-                if(!contactIds.contains(Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))))){
-                    contactIds.add(Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))));
-                }else {
-                    Log.i("group_info_checker", "contains: " + Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))));
+            String labelId = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID));
+            List<Integer> rawIds = new ArrayList<>();
+            for (int i = 0; i < rawIdLabelIds.size(); i++) {
+                if (rawIdLabelIds.get(i).labelId.equals(labelId)) {
+                    rawIds.add(Integer.valueOf(rawIdLabelIds.get(i).rawId));
                 }
             }
-            group.contactIds = contactIds;
+            List<Integer> contactIds = getContactIds(rawIdContactIdPair, rawIds);
             if (!sourceIds.contains(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)))) {
+                group.contactIds = contactIds;
                 sourceIds.add(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)));
                 labels.add(group);
             } else {
+                int index = sourceIds.indexOf(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)));
+                labels.get(index).contactIds.addAll(contactIds);
                 Log.i("group_info_checker", "group: " + cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)) + " is existing");
             }
 
@@ -104,14 +105,24 @@ public class GroupAccessor {
         return labels;
     }
 
-    public List<Integer> getKeysByValue(Map<String, String> map, String value) {
-        List<Integer> keys = new ArrayList<>();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            if (Objects.equals(value, entry.getValue())) {
-                keys.add(Integer.valueOf(entry.getKey()));
+    /**
+     * Converts given rawContactId/contactId pairs into only contact id list.
+     *
+     * @param rawIdContactId HashMap that contains rawContactId(key) and contactId(value)
+     * @param rawIds         List of rawContactIds that needed to be converted.
+     * @return List converted contactIds
+     */
+    public List<Integer> getContactIds(HashMap<String, String> rawIdContactId, List<Integer> rawIds) {
+        List<Integer> contactIds = new ArrayList<>();
+        for (int i = 0; i < rawIdContactId.size(); i++) {
+            if (!contactIds.contains(Integer.valueOf(rawIdContactId.get(String.valueOf(rawIds.get(i)))))) {
+                contactIds.add(Integer.valueOf(rawIdContactId.get(String.valueOf(rawIds.get(i)))));
+                Log.i("contactId_checker", "rawId: " + rawIds.get(i) + "\ncontactId: " + rawIdContactId.get(String.valueOf(rawIds.get(i))));
+            } else {
+                Log.i("contactId_checker", "contains: " + rawIdContactId.get(String.valueOf(rawIds.get(i))));
             }
         }
-        return keys;
+        return rawIds;
     }
 
     /**
@@ -350,14 +361,8 @@ public class GroupAccessor {
         return map;
     }
 
-    /**
-     * Gets all existing labels for all rawContactIds.
-     *
-     * @return HashMap that contains rawContactId and label id
-     * (key - rawContactId, value - label id)
-     */
-    private HashMap<String, String> getExistingRawIdLabelIdPairs() {
-        HashMap<String, String> map = new HashMap<>();
+    private List<RawIdLabelId> getExistingRawIdLabelIdPairs() {
+        List<RawIdLabelId> list = new ArrayList<>();
         Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.Data.CONTENT_URI,
                 new String[]{
                         ContactsContract.Data.MIMETYPE,
@@ -369,11 +374,12 @@ public class GroupAccessor {
                 null,
                 null);
         while (cursor.moveToNext()) {
-            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
+            RawIdLabelId rawIdLabelId = new RawIdLabelId(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
                     cursor.getString(cursor.getColumnIndex(ContactsContract.Data.DATA1)));
+            list.add(rawIdLabelId);
         }
         cursor.close();
-        return map;
+        return list;
     }
 
     /**
@@ -400,21 +406,6 @@ public class GroupAccessor {
         return map;
     }
 
-    /**
-     * Gets all contacts attached to given label.
-     *
-     * @param labelId label's id
-     * @return List of contact ids that are attached to label
-     */
-    private List<String> getExistingContacts(String labelId) {
-        List<String> contactIds = new ArrayList<>();
-        Cursor cursor = getContactsForLabel(new String[]{labelId});
-        while (cursor.moveToNext()) {
-            contactIds.add(cursor.getString(0));
-            Log.d("duplicate_list_checker", "" + cursor.getString(0));
-        }
-        return contactIds;
-    }
 
     /**
      * Gets cursor, that contains all source ids and label ids for given source id.
