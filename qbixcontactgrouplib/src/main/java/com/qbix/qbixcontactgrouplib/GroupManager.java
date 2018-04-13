@@ -115,8 +115,8 @@ public class GroupManager extends CordovaPlugin {
                 getWritePermission(REMOVE_CONTACT_FROM_LABEL_REQ_CODE);
             }
             return true;
-        }else if(action.equals(ADD_CONTACT_TO_LABEL_ACTION)){
-            if(PermissionHelper.hasPermission(this, WRITE)){
+        } else if (action.equals(ADD_CONTACT_TO_LABEL_ACTION)) {
+            if (PermissionHelper.hasPermission(this, WRITE)) {
                 this.cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
                         try {
@@ -127,15 +127,19 @@ public class GroupManager extends CordovaPlugin {
                         }
                     }
                 });
-            }else {
+            } else {
                 getWritePermission(ADD_CONTACT_TO_LABEL_REQ_CODE);
             }
             return true;
-        }else if(action.equals(REMOVE_LABEL_ACTION)){
-            if(PermissionHelper.hasPermission(this, ACCOUNTS)){
-
-            }else {
-               getAccountPermission(REMOVE_LABEL_REQ_CODE);
+        } else if (action.equals(REMOVE_LABEL_ACTION)) {
+            if (PermissionHelper.hasPermission(this, ACCOUNTS)) {
+                this.cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        removeLabelFromDatabase(executeArgs);
+                    }
+                });
+            } else {
+                getAccountPermission(REMOVE_LABEL_REQ_CODE);
             }
             return true;
         }
@@ -204,14 +208,35 @@ public class GroupManager extends CordovaPlugin {
             String addMessage = groupAccessor.addLabelToContacts(labelId, idArray);
             if (addMessage.equals(SUCCESS)) {
                 callbackContext.success();
-            } else if(addMessage.equals(UNKNOWN_ERROR)){
+            } else if (addMessage.equals(UNKNOWN_ERROR)) {
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, addMessage));
-            }else {
+            } else {
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, addMessage));
             }
         } catch (JSONException e) {
             callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
         }
+    }
+
+    /**
+     * Removes all labels with given sourceId.
+     *
+     * @param args Arguments from {@link #execute(String, JSONArray, CallbackContext)} method
+     */
+    private void removeLabelFromDatabase(JSONArray args) {
+        try {
+            final JSONObject filter = args.getJSONObject(0);
+            final String sourceId = filter.getString("labelId");
+            String removeMessage = groupAccessor.removeLabelFromData(sourceId);
+            if (removeMessage.equals(SUCCESS)) {
+                callbackContext.success();
+            } else {
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, removeMessage));
+            }
+        } catch (JSONException e) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
+        }
+
     }
 
     public void onRequestPermissionResult(int requestCode, String[] permissions,
@@ -239,7 +264,11 @@ public class GroupManager extends CordovaPlugin {
                 });
                 break;
             case REMOVE_LABEL_REQ_CODE:
-
+                this.cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        removeLabelFromDatabase(executeArgs);
+                    }
+                });
                 break;
         }
     }

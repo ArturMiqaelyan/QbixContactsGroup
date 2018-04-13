@@ -5,16 +5,21 @@ import android.accounts.AccountManager;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
 import android.content.ContentResolver;
-import android.content.Context;
 import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.util.Log;
+import android.widget.ListView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * This class defines SDK-independent API for communication with
@@ -43,6 +48,7 @@ public class GroupAccessor {
                 new String[]{
                         ContactsContract.Groups._ID,
                         ContactsContract.Groups.SOURCE_ID,
+                        ContactsContract.Groups.TITLE,
                         ContactsContract.Groups.NOTES,
                         ContactsContract.Groups.SUMMARY_COUNT,
                         ContactsContract.Groups.GROUP_VISIBLE,
@@ -54,34 +60,58 @@ public class GroupAccessor {
                 null,
                 null);
         List<String> sourceIds = new ArrayList<>();
+        HashMap<String, String> existingLabels = getExistingRawIdLabelIdPairs();
+        HashMap<String, String> rawIdContactIdPair = getExistingRawIdContactIdPairs();
         while (cursor.moveToNext()) {
             QbixGroup group = new QbixGroup();
-            group.id = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID));
+
             group.sourceId = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID));
+            group.title = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.TITLE));
             group.notes = cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.NOTES));
             group.summaryCount = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.SUMMARY_COUNT));
             group.isVisible = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.GROUP_VISIBLE)) == 0;
             group.isDeleted = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.DELETED)) == 1;
             group.shouldSync = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.SHOULD_SYNC)) == 1;
             group.readOnly = cursor.getInt(cursor.getColumnIndex(ContactsContract.Groups.GROUP_IS_READ_ONLY)) == 1;
-            Log.i("group_info_checker", "id: " + group.id);
+            Log.i("group_info_checker", "id: " + cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID)));
+            Log.i("group_info_checker", "source_id: " + group.sourceId);
+            Log.i("group_info_checker", "title: " + group.title);
             Log.i("group_info_checker", "notes: " + group.notes);
             Log.i("group_info_checker", "summary_count: " + group.summaryCount);
             Log.i("group_info_checker", "is_visible: " + group.isVisible);
             Log.i("group_info_checker", "deleted: " + group.isDeleted);
             Log.i("group_info_checker", "should_sync: " + group.shouldSync);
             Log.i("group_info_checker", "read_only: " + group.readOnly);
-
-            if(!sourceIds.contains(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)))){
+            List<Integer> rawContactIds = getKeysByValue(existingLabels, cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID)));
+            List<Integer> contactIds = new ArrayList<>();
+            for (int i = 0; i < rawContactIds.size(); i++) {
+                if(!contactIds.contains(Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))))){
+                    contactIds.add(Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))));
+                }else {
+                    Log.i("group_info_checker", "contains: " + Integer.valueOf(rawIdContactIdPair.get(rawContactIds.get(i))));
+                }
+            }
+            group.contactIds = contactIds;
+            if (!sourceIds.contains(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)))) {
                 sourceIds.add(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)));
                 labels.add(group);
-            }else{
-                Log.i("group_info_checker", "group: "+ cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID))+" is existing");
+            } else {
+                Log.i("group_info_checker", "group: " + cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)) + " is existing");
             }
 
         }
         cursor.close();
         return labels;
+    }
+
+    public List<Integer> getKeysByValue(Map<String, String> map, String value) {
+        List<Integer> keys = new ArrayList<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            if (Objects.equals(value, entry.getValue())) {
+                keys.add(Integer.valueOf(entry.getKey()));
+            }
+        }
+        return keys;
     }
 
     /**
@@ -123,9 +153,7 @@ public class GroupAccessor {
         List<String> rawIdList = new ArrayList<>();
         Cursor cursor = app.getActivity().getContentResolver().query(
                 ContactsContract.RawContacts.CONTENT_URI,
-                new String[]{
-                        ContactsContract.RawContacts._ID,
-                },
+                new String[]{ContactsContract.RawContacts._ID},
                 ContactsContract.RawContacts.CONTACT_ID + getSuffix(contactIds.length),
                 contactIds, null
         );
@@ -199,42 +227,177 @@ public class GroupAccessor {
     /**
      * Add label to given contacts.
      *
-     * @param labelId    Label id that wanted to be added
+     * @param sourceId   source id which label wanted to be added
      * @param contactIds Contact id's array to which label should be added
      * @return success message if succeeded and exception message if failed
      */
-    protected String addLabelToContacts(String labelId, String[] contactIds) {
+    protected String addLabelToContacts(String sourceId, String[] contactIds) {
         ArrayList<ContentProviderOperation> ops =
                 new ArrayList<>();
-        String[] rawIds = getRawContactIds(contactIds);
-        List<String> existingContacts = getExistingContacts(labelId);
-        for (int i = 0; i < rawIds.length; i++) {
-            if (!existingContacts.contains(rawIds[i])) {
-                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                        .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawIds[i])
-                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE)
-                        .withValue(ContactsContract.Data.DATA1, labelId)
-                        .build());
-                Log.d("duplicate_checker", "added: " + rawIds[i]);
+        String[] rawContactIds = getRawContactIds(contactIds);
+        HashMap<String, String> rawIdAccName = getRawContactIdAccountNamePair(rawContactIds);
+        HashMap<String, String> accNameLabelId = getAccountNameLabelIdPair(sourceId);
+        HashMap<String, String> existingLabels = getExistingRawIdLabelIdPairs(rawContactIds);
+        for (int i = 0; i < rawContactIds.length; i++) {
+            String labelId = accNameLabelId.get(rawIdAccName.get(rawContactIds[i]));
+            if (labelId != null) {
+                if (!existingLabels.get(rawContactIds[i]).equals(labelId)) {
+                    ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                            .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawContactIds[i])
+                            .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE)
+                            .withValue(ContactsContract.Data.DATA1, accNameLabelId.get(rawIdAccName.get(rawContactIds[i])))
+                            .withYieldAllowed(i == contactIds.length - 1)
+                            .build());
+                } else {
+                    Log.d("duplicate_checker", "duplicate!!! " + rawContactIds[i]);
+                }
             } else {
-                Log.d("duplicate_checker", "duplicate!!! " + rawIds[i]);
+                Log.d("duplicate_checker", "no label for that contact" + rawContactIds[i]);
             }
         }
+
         try {
-            ContentProviderResult[] results = app.getActivity().getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
+            ContentProviderResult[] results = app.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
             if (results.length >= 1) {
                 Log.d("duplicate_checker", results[0].toString());
-                return GroupManager.SUCCESS;
-            } else {
-                return GroupManager.UNKNOWN_ERROR;
             }
         } catch (RemoteException e) {
             e.printStackTrace();
-            return e.getMessage();
+            return e.getMessage()
         } catch (OperationApplicationException e) {
             e.printStackTrace();
             return e.getMessage();
         }
+        return GroupManager.SUCCESS;
+    }
+
+    /**
+     * Gets all account names of for rawContactIds and set them into HashMap.
+     *
+     * @param rawContactIds rawContactIds which account names wanted to be returned
+     * @return HashMap that contains rawContactId and its account name
+     * (key - raw contact id, value - account name)
+     */
+    private HashMap<String, String> getRawContactIdAccountNamePair(String[] rawContactIds) {
+        HashMap<String, String> map = new HashMap<>();
+        Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.RawContacts.CONTENT_URI,
+                new String[]{
+                        ContactsContract.RawContacts._ID,
+                        ContactsContract.RawContacts.ACCOUNT_NAME
+                },
+                ContactsContract.RawContacts._ID + getSuffix(rawContactIds.length),
+                rawContactIds,
+                null);
+        while (cursor.moveToNext()) {
+            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.RawContacts._ID)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.RawContacts.ACCOUNT_NAME)));
+        }
+        cursor.close();
+        return map;
+    }
+
+    /**
+     * Gets all label ids for sourceId and binds them to their account names.
+     *
+     * @param sourceId sourceId which labelIds wanted to be returned
+     * @return HashMap that contains rawContactId and its account name
+     * (key - account name, value - label id)
+     */
+    private HashMap<String, String> getAccountNameLabelIdPair(String sourceId) {
+        HashMap<String, String> map = new HashMap<>();
+        Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.Groups.CONTENT_URI,
+                new String[]{
+                        ContactsContract.Groups._ID,
+                        ContactsContract.Groups.SOURCE_ID,
+                        ContactsContract.Groups.ACCOUNT_NAME
+                },
+                ContactsContract.Groups.SOURCE_ID + "='" + sourceId + "'",
+                null,
+                null);
+        while (cursor.moveToNext()) {
+            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.ACCOUNT_NAME)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID)));
+        }
+        cursor.close();
+        return map;
+    }
+
+    /**
+     * Gets all existing labels for given rawContactIds.
+     *
+     * @param rawContactIds Array of rawContactIds which labels wanted to be returned
+     * @return HashMap that contains rawContactId and label id
+     * (key - rawContactId, value - label id)
+     */
+    private HashMap<String, String> getExistingRawIdLabelIdPairs(String[] rawContactIds) {
+        HashMap<String, String> map = new HashMap<>();
+        Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.Data.CONTENT_URI,
+                new String[]{
+                        ContactsContract.Data.MIMETYPE,
+                        ContactsContract.Data.RAW_CONTACT_ID,
+                        ContactsContract.Data.DATA1
+                },
+                ContactsContract.Data.MIMETYPE + "='" +
+                        ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE +
+                        "' AND " + ContactsContract.Data.RAW_CONTACT_ID + getSuffix(rawContactIds.length),
+                rawContactIds,
+                null);
+        while (cursor.moveToNext()) {
+            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.Data.DATA1)));
+        }
+        cursor.close();
+        return map;
+    }
+
+    /**
+     * Gets all existing labels for all rawContactIds.
+     *
+     * @return HashMap that contains rawContactId and label id
+     * (key - rawContactId, value - label id)
+     */
+    private HashMap<String, String> getExistingRawIdLabelIdPairs() {
+        HashMap<String, String> map = new HashMap<>();
+        Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.Data.CONTENT_URI,
+                new String[]{
+                        ContactsContract.Data.MIMETYPE,
+                        ContactsContract.Data.RAW_CONTACT_ID,
+                        ContactsContract.Data.DATA1
+                },
+                ContactsContract.Data.MIMETYPE + "='" +
+                        ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE + "'",
+                null,
+                null);
+        while (cursor.moveToNext()) {
+            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.Data.DATA1)));
+        }
+        cursor.close();
+        return map;
+    }
+
+    /**
+     * Gets all existing contactIds for all rawContactIds.
+     *
+     * @return HashMap that contains rawContactId and contact id
+     * (key - rawContactId, value - contact id)
+     */
+    private HashMap<String, String> getExistingRawIdContactIdPairs() {
+        HashMap<String, String> map = new HashMap<>();
+        Cursor cursor = app.getActivity().getContentResolver().query(ContactsContract.RawContacts.CONTENT_URI,
+                new String[]{
+                        ContactsContract.RawContacts._ID,
+                        ContactsContract.RawContacts.CONTACT_ID
+                },
+                null,
+                null,
+                null);
+        while (cursor.moveToNext()) {
+            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.RawContacts._ID)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.RawContacts.CONTACT_ID)));
+        }
+        cursor.close();
+        return map;
     }
 
     /**
@@ -254,19 +417,19 @@ public class GroupAccessor {
     }
 
     /**
-     * Gets cursor, that contains all group titles and ids for given label name.
+     * Gets cursor, that contains all source ids and label ids for given source id.
      * (can contain multiple values, because Android System allows to create groups with the same name)
      *
-     * @param label label name (title)
-     * @return Cursor, that contains all groups that matches given label name.
+     * @param sourceId Label source id
+     * @return Cursor, that contains all groups that matches given sourceId name.
      */
-    private Cursor getGroupTitle(String label) {
+    private Cursor getGroupTitle(String sourceId) {
         Cursor cursor = app.getActivity().getContentResolver().query(
                 ContactsContract.Groups.CONTENT_URI,
                 new String[]{
                         ContactsContract.Groups._ID,
-                        ContactsContract.Groups.TITLE
-                }, ContactsContract.Groups.TITLE + "=?", new String[]{label}, null
+                        ContactsContract.Groups.SOURCE_ID
+                }, ContactsContract.Groups.SOURCE_ID + "=?", new String[]{sourceId}, null
         );
         return cursor;
     }
@@ -333,15 +496,15 @@ public class GroupAccessor {
     /**
      * Removes label from database and syncs all accounts.
      *
-     * @param labelId Label id that is wanted to be deleted
+     * @param sourceId Source id that is wanted to be deleted
      * @return success message if succeed and exception message if failed
      */
-    protected String removeLabelFromData(String labelId) {
+    protected String removeLabelFromData(String sourceId) {
         ArrayList<ContentProviderOperation> ops =
                 new ArrayList<>();
 
         ops.add(ContentProviderOperation.newDelete(ContactsContract.Groups.CONTENT_URI)
-                .withSelection(ContactsContract.Groups._ID + "=?", new String[]{labelId})
+                .withSelection(ContactsContract.Groups.SOURCE_ID + "=?", new String[]{sourceId})
                 .withYieldAllowed(true)
                 .build());
         try {
@@ -359,30 +522,9 @@ public class GroupAccessor {
         return GroupManager.SUCCESS;
     }
 
-    private void getAllContactsForLabel(String label) {
-        List<String> args = new ArrayList<>();
-        Cursor groupCursor = getGroupTitle(label);
-        while (groupCursor.moveToNext()) {
-            String id = groupCursor.getString(0);
-            args.add(id);
-            Log.d("id_checker", "id " + id);
-        }
-        groupCursor.close();
-        String[] argsArray = new String[args.size()];
-        for (int i = 0; i < args.size(); i++) {
-            argsArray[i] = args.get(i);
-        }
-        Cursor dataCursor = getContactsForLabel(argsArray);
-        if (dataCursor == null) {
-            Log.d("group_info_checker", "no matches");
-            return;
-        }
-        while (dataCursor.moveToNext()) {
-            String id = dataCursor.getString(0);
-            String groupId = dataCursor.getString(1);
-            Log.d("group_info_checker", "groupTitle : " + groupId + " contact_id: " + id);
-        }
-        dataCursor.close();
+
+    private void getAllContactsForLabel(String sourceId) {
+
     }
 
 }
