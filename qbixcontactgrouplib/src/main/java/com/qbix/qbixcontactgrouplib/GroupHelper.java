@@ -111,7 +111,7 @@ public class GroupHelper {
      * @param count Size of selectionArgs
      * @return string for query selection (example: "IN(?,?...,?)")
      */
-    private String getSuffix(int count) {
+    protected String getSuffix(int count) {
         String selectionSuffix = " IN(";
         if (count == 1) {
             //checks if there is 1 argument
@@ -195,7 +195,7 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and its account name
      * (key - account name, value - label id)
      */
-    protected HashMap<String, String> getAccountNameLabelIdPair(Context context, String sourceId) {
+    protected HashMap<String, String> getLabelIdAccountNamePair(Context context, String sourceId) {
         HashMap<String, String> map = new HashMap<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.Groups.CONTENT_URI,
                 new String[]{
@@ -222,8 +222,8 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and label id
      * (key - rawContactId, value - label id)
      */
-    protected HashMap<String, String> getExistingRawIdLabelIdPairs(Context context, String[] rawContactIds) {
-        HashMap<String, String> map = new HashMap<>();
+    protected List<RawIdLabelId> getExistingRawIdLabelIdPairs(Context context, String[] rawContactIds) {
+        List<RawIdLabelId> list = new ArrayList<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.Data.CONTENT_URI,
                 new String[]{
                         ContactsContract.Data.MIMETYPE,
@@ -236,11 +236,11 @@ public class GroupHelper {
                 rawContactIds,
                 null);
         while (cursor.moveToNext()) {
-            map.put(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
-                    cursor.getString(cursor.getColumnIndex(ContactsContract.Data.DATA1)));
+            list.add(new RawIdLabelId(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)),
+                    cursor.getString(cursor.getColumnIndex(ContactsContract.Data.DATA1))));
         }
         cursor.close();
-        return map;
+        return list;
     }
 
     /**

@@ -99,20 +99,39 @@ public class GroupAccessor {
     /**
      * Removes label from contacts.
      *
-     * @param labelId    The label id that wanted to be removed
+     * @param sourceId    The source id which label wanted to be removed
      * @param contactIds Array of contact ids from which label must be removed
      * @return success message if succeeded and exception message if failed
      */
-    protected String removeLabelFromContacts(String labelId, String[] contactIds) {
+    protected String removeLabelFromContacts(String sourceId, String[] contactIds) {
         ArrayList<ContentProviderOperation> ops =
                 new ArrayList<>();
-        String[] rawIds = GroupHelper.getInstance().getRawContactIds(app.getActivity(), contactIds);
-        ops.add(ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
-                .withSelection(ContactsContract.Data.MIMETYPE + "='" + ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE
-                                + "' AND " + ContactsContract.Data.DATA1 + "='" + labelId
-                                + "' AND " + ContactsContract.Data.RAW_CONTACT_ID + GroupHelper.getInstance().getSuffix(rawIds.length),
-                        rawIds)
-                .build());
+        String[] rawContactIds = GroupHelper.getInstance().getRawContactIds(app.getActivity(), contactIds);
+        HashMap<String, String> rawIdAccName = GroupHelper.getInstance().getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
+        HashMap<String, String> accNameLabelId = GroupHelper.getInstance().getLabelIdAccountNamePair(app.getActivity(), sourceId);
+        List<RawIdLabelId> existingLabels = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
+
+        for (int i = 0; i < rawContactIds.length; i++) {
+            String labelId = accNameLabelId.get(rawIdAccName.get(rawContactIds[i]));
+            if (labelId != null) {
+                for (int j = 0; j < existingLabels.size(); j++) {
+                    if (existingLabels.get(j).rawId.equals(rawContactIds[i])&&existingLabels.get(j).labelId.equals(labelId)) {
+                        ops.add(ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
+                                .withSelection(ContactsContract.Data.MIMETYPE + "='" + ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE
+                                                + "' AND " + ContactsContract.Data.DATA1 + "='" + labelId
+                                                + "' AND " + ContactsContract.Data.RAW_CONTACT_ID + "='"+rawContactIds[i],
+                                        null)
+                                .withYieldAllowed(i == rawContactIds.length - 1)
+                                .build());
+                    } else {
+                        Log.d("delete_checker", "not that one!!! " + rawContactIds[i]);
+                    }
+                }
+            } else {
+                Log.d("delete_checker", "no label for that contact" + rawContactIds[i]);
+            }
+        }
+
         try {
             app.getActivity().getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
         } catch (RemoteException e) {
@@ -137,12 +156,18 @@ public class GroupAccessor {
                 new ArrayList<>();
         String[] rawContactIds = GroupHelper.getInstance().getRawContactIds(app.getActivity(), contactIds);
         HashMap<String, String> rawIdAccName = GroupHelper.getInstance().getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
-        HashMap<String, String> accNameLabelId = GroupHelper.getInstance().getAccountNameLabelIdPair(app.getActivity(), sourceId);
-        HashMap<String, String> existingLabels = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
+        HashMap<String, String> accNameLabelId = GroupHelper.getInstance().getLabelIdAccountNamePair(app.getActivity(), sourceId);
+        List<RawIdLabelId> existingLabels = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
         for (int i = 0; i < rawContactIds.length; i++) {
             String labelId = accNameLabelId.get(rawIdAccName.get(rawContactIds[i]));
+            boolean exists = false;
             if (labelId != null) {
-                if (!existingLabels.get(rawContactIds[i]).equals(labelId)) {
+                for (int j = 0; j < existingLabels.size(); j++) {
+                    if(existingLabels.get(j).rawId.equals(rawContactIds[i])&&existingLabels.get(j).labelId.equals(labelId)){
+                        exists = true;
+                    }
+                }
+                if (!exists) {
                     ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                             .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawContactIds[i])
                             .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE)
@@ -152,6 +177,7 @@ public class GroupAccessor {
                 } else {
                     Log.d("duplicate_checker", "duplicate!!! " + rawContactIds[i]);
                 }
+
             } else {
                 Log.d("duplicate_checker", "no label for that contact" + rawContactIds[i]);
             }
