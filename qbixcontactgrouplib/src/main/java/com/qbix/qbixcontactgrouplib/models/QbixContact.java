@@ -1,4 +1,4 @@
-package com.qbix.qbixcontactgrouplib;
+package com.qbix.qbixcontactgrouplib.models;
 
 import java.util.ArrayList;
 import java.util.List;
