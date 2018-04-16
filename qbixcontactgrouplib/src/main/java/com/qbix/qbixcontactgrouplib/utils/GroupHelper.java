@@ -1,4 +1,4 @@
-package com.qbix.qbixcontactgrouplib;
+package com.qbix.qbixcontactgrouplib.utils;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -9,29 +9,14 @@ import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.util.Log;
 
+import com.qbix.qbixcontactgrouplib.models.RawIdLabelId;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class GroupHelper {
 
-    private volatile static GroupHelper instance = null;
-
-    private GroupHelper() {
-    }
-
-    public static GroupHelper getInstance() {
-
-        if (instance == null) {
-            synchronized (GroupHelper.class) {
-                if (instance == null) {
-                    instance = new GroupHelper();
-                }
-            }
-        }
-
-        return instance;
-    }
 
     /**
      * Gets all existing rawContactId and label id pairs
@@ -39,7 +24,7 @@ public class GroupHelper {
      * @param context Context instance for db interactions
      * @return RawIdLabelId object that contains {@link RawIdLabelId#labelId} and {@link RawIdLabelId#rawId}
      */
-    protected List<RawIdLabelId> getExistingRawIdLabelIdPairs(Context context) {
+    public static List<RawIdLabelId> getExistingRawIdLabelIdPairs(Context context) {
         List<RawIdLabelId> list = new ArrayList<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.Data.CONTENT_URI,
                 new String[]{
@@ -67,7 +52,7 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and contact id
      * (key - rawContactId, value - contact id)
      */
-    protected HashMap<String, String> getExistingRawIdContactIdPairs(Context context) {
+    public static HashMap<String, String> getExistingRawIdContactIdPairs(Context context) {
         HashMap<String, String> map = new HashMap<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.RawContacts.CONTENT_URI,
                 new String[]{
@@ -111,7 +96,7 @@ public class GroupHelper {
      * @param count Size of selectionArgs
      * @return string for query selection (example: "IN(?,?...,?)")
      */
-    protected String getSuffix(int count) {
+    public static String getSuffix(int count) {
         String selectionSuffix = " IN(";
         if (count == 1) {
             //checks if there is 1 argument
@@ -141,12 +126,12 @@ public class GroupHelper {
      * @param contactIds Array of contactIds which rawContactId's are needed
      * @return rawContactId array
      */
-    protected String[] getRawContactIds(Context context, String[] contactIds) {
+    public static String[] getRawContactIds(Context context, String[] contactIds) {
         List<String> rawIdList = new ArrayList<>();
         Cursor cursor = context.getContentResolver().query(
                 ContactsContract.RawContacts.CONTENT_URI,
                 new String[]{ContactsContract.RawContacts._ID},
-                ContactsContract.RawContacts.CONTACT_ID + GroupHelper.getInstance().getSuffix(contactIds.length),
+                ContactsContract.RawContacts.CONTACT_ID + GroupHelper.getSuffix(contactIds.length),
                 contactIds, null
         );
         while (cursor.moveToNext()) {
@@ -169,14 +154,14 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and its account name
      * (key - raw contact id, value - account name)
      */
-    protected HashMap<String, String> getRawContactIdAccountNamePair(Context context, String[] rawContactIds) {
+    public static HashMap<String, String> getRawContactIdAccountNamePair(Context context, String[] rawContactIds) {
         HashMap<String, String> map = new HashMap<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.RawContacts.CONTENT_URI,
                 new String[]{
                         ContactsContract.RawContacts._ID,
                         ContactsContract.RawContacts.ACCOUNT_NAME
                 },
-                ContactsContract.RawContacts._ID + GroupHelper.getInstance().getSuffix(rawContactIds.length),
+                ContactsContract.RawContacts._ID + GroupHelper.getSuffix(rawContactIds.length),
                 rawContactIds,
                 null);
         while (cursor.moveToNext()) {
@@ -195,7 +180,7 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and its account name
      * (key - account name, value - label id)
      */
-    protected HashMap<String, String> getLabelIdAccountNamePair(Context context, String sourceId) {
+    public static HashMap<String, String> getAccountNameLabelIdPair(Context context, String sourceId) {
         HashMap<String, String> map = new HashMap<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.Groups.CONTENT_URI,
                 new String[]{
@@ -222,7 +207,7 @@ public class GroupHelper {
      * @return HashMap that contains rawContactId and label id
      * (key - rawContactId, value - label id)
      */
-    protected List<RawIdLabelId> getExistingRawIdLabelIdPairs(Context context, String[] rawContactIds) {
+    public static List<RawIdLabelId> getExistingRawIdLabelIdPairs(Context context, String[] rawContactIds) {
         List<RawIdLabelId> list = new ArrayList<>();
         Cursor cursor = context.getContentResolver().query(ContactsContract.Data.CONTENT_URI,
                 new String[]{
@@ -232,7 +217,7 @@ public class GroupHelper {
                 },
                 ContactsContract.Data.MIMETYPE + "='" +
                         ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE +
-                        "' AND " + ContactsContract.Data.RAW_CONTACT_ID + GroupHelper.getInstance().getSuffix(rawContactIds.length),
+                        "' AND " + ContactsContract.Data.RAW_CONTACT_ID + GroupHelper.getSuffix(rawContactIds.length),
                 rawContactIds,
                 null);
         while (cursor.moveToNext()) {
@@ -249,7 +234,7 @@ public class GroupHelper {
      * Forces the system to sync all accounts.(if you dont sync some deleted data can be shown to user
      * as before till system syncs automatically).
      */
-    protected void requestSyncNow(final Context context) {
+    public static void requestSyncNow(final Context context) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -257,8 +242,6 @@ public class GroupHelper {
                 AccountManager accountManager = AccountManager.get(context);
                 Account[] accounts = accountManager.getAccounts();
                 boolean isMasterSyncOn = ContentResolver.getMasterSyncAutomatically();
-
-
                 for (Account account : accounts) {
 
                     Log.d("sync_checker", "account=" + account);

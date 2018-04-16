@@ -8,6 +8,10 @@ import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.util.Log;
 
+import com.qbix.qbixcontactgrouplib.models.QbixGroup;
+import com.qbix.qbixcontactgrouplib.models.RawIdLabelId;
+import com.qbix.qbixcontactgrouplib.utils.GroupHelper;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,8 +55,8 @@ public class GroupAccessor {
                 null,
                 null);
         List<String> sourceIds = new ArrayList<>();
-        List<RawIdLabelId> rawIdLabelIds = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity());
-        HashMap<String, String> rawIdContactIdPair = GroupHelper.getInstance().getExistingRawIdContactIdPairs(app.getActivity());
+        List<RawIdLabelId> rawIdLabelIds = GroupHelper.getExistingRawIdLabelIdPairs(app.getActivity());
+        HashMap<String, String> rawIdContactIdPair = GroupHelper.getExistingRawIdContactIdPairs(app.getActivity());
         while (cursor.moveToNext()) {
             QbixGroup group = new QbixGroup();
 
@@ -80,7 +84,7 @@ public class GroupAccessor {
                     rawIds.add(Integer.valueOf(rawIdLabelIds.get(i).rawId));
                 }
             }
-            List<Integer> contactIds = GroupHelper.getInstance().getContactIds(rawIdContactIdPair, rawIds);
+            List<Integer> contactIds = GroupHelper.getContactIds(rawIdContactIdPair, rawIds);
             if (!sourceIds.contains(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)))) {
                 group.contactIds = contactIds;
                 sourceIds.add(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID)));
@@ -106,10 +110,10 @@ public class GroupAccessor {
     protected String removeLabelFromContacts(String sourceId, String[] contactIds) {
         ArrayList<ContentProviderOperation> ops =
                 new ArrayList<>();
-        String[] rawContactIds = GroupHelper.getInstance().getRawContactIds(app.getActivity(), contactIds);
-        HashMap<String, String> rawIdAccName = GroupHelper.getInstance().getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
-        HashMap<String, String> accNameLabelId = GroupHelper.getInstance().getLabelIdAccountNamePair(app.getActivity(), sourceId);
-        List<RawIdLabelId> existingLabels = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
+        String[] rawContactIds = GroupHelper.getRawContactIds(app.getActivity(), contactIds);
+        HashMap<String, String> rawIdAccName = GroupHelper.getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
+        HashMap<String, String> accNameLabelId = GroupHelper.getAccountNameLabelIdPair(app.getActivity(), sourceId);
+        List<RawIdLabelId> existingLabels = GroupHelper.getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
 
         for (int i = 0; i < rawContactIds.length; i++) {
             String labelId = accNameLabelId.get(rawIdAccName.get(rawContactIds[i]));
@@ -154,10 +158,10 @@ public class GroupAccessor {
     protected String addLabelToContacts(String sourceId, String[] contactIds) {
         ArrayList<ContentProviderOperation> ops =
                 new ArrayList<>();
-        String[] rawContactIds = GroupHelper.getInstance().getRawContactIds(app.getActivity(), contactIds);
-        HashMap<String, String> rawIdAccName = GroupHelper.getInstance().getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
-        HashMap<String, String> accNameLabelId = GroupHelper.getInstance().getLabelIdAccountNamePair(app.getActivity(), sourceId);
-        List<RawIdLabelId> existingLabels = GroupHelper.getInstance().getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
+        String[] rawContactIds = GroupHelper.getRawContactIds(app.getActivity(), contactIds);
+        HashMap<String, String> rawIdAccName = GroupHelper.getRawContactIdAccountNamePair(app.getActivity(), rawContactIds);
+        HashMap<String, String> accNameLabelId = GroupHelper.getAccountNameLabelIdPair(app.getActivity(), sourceId);
+        List<RawIdLabelId> existingLabels = GroupHelper.getExistingRawIdLabelIdPairs(app.getActivity(), rawContactIds);
         for (int i = 0; i < rawContactIds.length; i++) {
             String labelId = accNameLabelId.get(rawIdAccName.get(rawContactIds[i]));
             boolean exists = false;
@@ -223,7 +227,7 @@ public class GroupAccessor {
             e.printStackTrace();
             return e.getMessage();
         }
-        GroupHelper.getInstance().requestSyncNow(app.getActivity());
+        GroupHelper.requestSyncNow(app.getActivity());
         return GroupManager.SUCCESS;
     }
 

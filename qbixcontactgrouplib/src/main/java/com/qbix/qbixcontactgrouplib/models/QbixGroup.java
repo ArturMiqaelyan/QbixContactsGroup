@@ -1,4 +1,4 @@
-package com.qbix.qbixcontactgrouplib;
+package com.qbix.qbixcontactgrouplib.models;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -7,15 +7,15 @@ import java.util.List;
 
 public class QbixGroup {
 
-    String sourceId;
-    String title;
-    String notes;
-    int summaryCount;
-    boolean isVisible;
-    boolean isDeleted;
-    boolean shouldSync;
-    boolean readOnly;
-    List<Integer> contactIds;
+    public String sourceId;
+    public String title;
+    public String notes;
+    public int summaryCount;
+    public boolean isVisible;
+    public boolean isDeleted;
+    public boolean shouldSync;
+    public boolean readOnly;
+    public List<Integer> contactIds;
 
     public JSONObject toJson() {
         try {

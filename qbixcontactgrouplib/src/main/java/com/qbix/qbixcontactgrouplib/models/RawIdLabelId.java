@@ -1,8 +1,8 @@
-package com.qbix.qbixcontactgrouplib;
+package com.qbix.qbixcontactgrouplib.models;
 
 public class RawIdLabelId {
-    String rawId;
-    String labelId;
+    public String rawId;
+    public String labelId;
 
     public RawIdLabelId(String rawId, String labelId) {
         this.rawId = rawId;

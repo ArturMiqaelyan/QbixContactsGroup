@@ -14,12 +14,15 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
+import com.qbix.qbixcontactgrouplib.models.QbixGroup;
+
 import java.util.List;
 
 public class GroupManager extends CordovaPlugin {
 
     //Actions
     private final String GET_ALL_LABELS_ACTION = "getAll";
+    private final String GET_ONE_OR_MORE_LABELS_ACTION = "get";
     private final String REMOVE_CONTACT_FROM_LABEL_ACTION = "removeContact";
     private final String ADD_CONTACT_TO_LABEL_ACTION = "addContact";
     private final String REMOVE_LABEL_ACTION = "remove";
@@ -99,6 +102,12 @@ public class GroupManager extends CordovaPlugin {
             }
 
             return true;
+        }else if(action.equals(GET_ONE_OR_MORE_LABELS_ACTION)){
+            if (PermissionHelper.hasPermission(this, READ)) {
+                //TODO: get method
+            } else {
+                getReadPermission(ALL_LABELS_REQ_CODE);
+            }
         } else if (action.equals(REMOVE_CONTACT_FROM_LABEL_ACTION)) {
             if (PermissionHelper.hasPermission(this, WRITE)) {
                 this.cordova.getThreadPool().execute(new Runnable() {
