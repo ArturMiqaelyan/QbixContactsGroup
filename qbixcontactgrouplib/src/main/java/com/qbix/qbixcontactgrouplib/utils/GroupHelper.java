@@ -46,7 +46,7 @@ public class GroupHelper {
     }
 
     /**
-     * Gets all existing contactIds for all rawContactIds.
+     * Gets all existing contactIds for all rawContactId pairs.
      *
      * @param context Context instance for db interactions
      * @return HashMap that contains rawContactId and contact id
@@ -77,7 +77,7 @@ public class GroupHelper {
      * @param rawIds         List of rawContactIds that needed to be converted.
      * @return List converted contactIds
      */
-    public List<Integer> getContactIds(HashMap<String, String> rawIdContactId, List<Integer> rawIds) {
+    public static List<Integer> getContactIds(HashMap<String, String> rawIdContactId, List<Integer> rawIds) {
         List<Integer> contactIds = new ArrayList<>();
         for (int i = 0; i < rawIdContactId.size(); i++) {
             if (!contactIds.contains(Integer.valueOf(rawIdContactId.get(String.valueOf(rawIds.get(i)))))) {
@@ -120,7 +120,7 @@ public class GroupHelper {
     }
 
     /**
-     * Gets all raw_contact_id's for given contactId array.
+     * Gets all rawContactId's for given contactId array.
      *
      * @param context Context instance for db interactions
      * @param contactIds Array of contactIds which rawContactId's are needed
@@ -262,5 +262,59 @@ public class GroupHelper {
             }
         }, "SyncLauncher").start();
 
+    }
+
+    /**
+     * Gets all rawContacts' ids which have labels with given sourceId.
+     *
+     * @param context Context instance for db interactions
+     * @param sourceId SourceId of labels which rawContacts' ids must be returned
+     * @return List of rawContactIds
+     */
+    public static List<Integer> getRawIdsBySourceId(Context context, String sourceId) {
+        List<Integer> rawIds = new ArrayList<>();
+        String[] labelIds = getLabelIdsForSourceId(context, sourceId);
+        Cursor cursor = context.getContentResolver().query(
+                ContactsContract.Data.CONTENT_URI,
+                new String[]{
+                        ContactsContract.Data.RAW_CONTACT_ID,
+                        ContactsContract.Data.DATA1
+                },
+                ContactsContract.Data.MIMETYPE + "='" + ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE + "' AND " +
+                        ContactsContract.Data.DATA1 + getSuffix(labelIds.length),
+                labelIds,
+                null);
+        while (cursor.moveToNext()) {
+            rawIds.add(Integer.valueOf(cursor.getString(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID))));
+        }
+        cursor.close();
+        return rawIds;
+    }
+
+    /**
+     * Converts given sourceId to Array of labelIds with that sourceId.
+     *
+     * @param context Context instance for db interactions
+     * @param sourceId SourceId which must be converted into labelId array
+     * @return Array of labelIds converted from given sourceId
+     */
+    public static String[] getLabelIdsForSourceId(Context context, String sourceId) {
+        List<String> labelIdList = new ArrayList<>();
+        Cursor cursor = context.getContentResolver().query(ContactsContract.Groups.CONTENT_URI,
+                new String[]{
+                        ContactsContract.Groups._ID,
+                        ContactsContract.Groups.SOURCE_ID
+                },
+                ContactsContract.Groups.SOURCE_ID + "='" + sourceId + "'",
+                null,
+                null);
+        while (cursor.moveToNext()) {
+            labelIdList.add(cursor.getString(cursor.getColumnIndex(ContactsContract.Groups._ID)));
+        }
+        String[] labelIdArray = new String[labelIdList.size()];
+        for (int i = 0; i < labelIdArray.length; i++) {
+            labelIdArray[i] = labelIdList.get(i);
+        }
+        return labelIdArray;
     }
 }

@@ -1,13 +1,17 @@
 package com.qbix.qbixcontactgrouplib;
 
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
+import android.content.Context;
 import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.util.Log;
 
+import com.qbix.qbixcontactgrouplib.models.AccNameGroup;
 import com.qbix.qbixcontactgrouplib.models.QbixGroup;
 import com.qbix.qbixcontactgrouplib.models.RawIdLabelId;
 import com.qbix.qbixcontactgrouplib.utils.GroupHelper;
@@ -33,7 +37,7 @@ public class GroupAccessor {
      * It will not get any system related labels
      * (such as "Starred in Android" or "My Contacts") and labels that are marked for deletion.
      *
-     * @return list of QbixGroup POJO, that contains group id and group title
+     * @return list of {@link QbixGroup} POJO
      */
     protected List<QbixGroup> getAllLabels() {
         List<QbixGroup> labels = new ArrayList<>();
@@ -145,7 +149,7 @@ public class GroupAccessor {
             e.printStackTrace();
             return e.getMessage();
         }
-        return GroupManager.SUCCESS;
+        return QUsersCordova.SUCCESS;
     }
 
     /**
@@ -199,7 +203,7 @@ public class GroupAccessor {
             e.printStackTrace();
             return e.getMessage();
         }
-        return GroupManager.SUCCESS;
+        return QUsersCordova.SUCCESS;
     }
 
     /**
@@ -228,7 +232,76 @@ public class GroupAccessor {
             return e.getMessage();
         }
         GroupHelper.requestSyncNow(app.getActivity());
-        return GroupManager.SUCCESS;
+        return QUsersCordova.SUCCESS;
     }
 
+    /**
+     * Gets labels that have given sourceIds.
+     *
+     * @param sourceIds Source ids list which labels wanted to be returned.
+     * @return list of {@link QbixGroup} POJO
+     */
+    protected List<QbixGroup> getLabelsBySourceId(String[] sourceIds) {
+        Cursor groupCursor = app.getActivity().getContentResolver().query(ContactsContract.Groups.CONTENT_SUMMARY_URI,
+                new String[]{
+                        ContactsContract.Groups.SOURCE_ID,
+                        ContactsContract.Groups.TITLE,
+                        ContactsContract.Groups.ACCOUNT_NAME,
+                        ContactsContract.Groups.NOTES,
+                        ContactsContract.Groups.SUMMARY_COUNT,
+                        ContactsContract.Groups.GROUP_VISIBLE,
+                        ContactsContract.Groups.DELETED,
+                        ContactsContract.Groups.SHOULD_SYNC,
+                        ContactsContract.Groups.GROUP_IS_READ_ONLY
+                },
+                ContactsContract.Groups.SOURCE_ID + GroupHelper.getSuffix(sourceIds.length),
+                sourceIds,
+                null);
+        AccountManager accountManager = AccountManager.get(app.getActivity());
+        Account[] accounts = accountManager.getAccounts();
+        List<AccNameGroup> accNameGroups = new ArrayList<>();
+        HashMap<String, String> rawIdContactIdPair = GroupHelper.getExistingRawIdContactIdPairs(app.getActivity());
+        while (groupCursor.moveToNext()) {
+            AccNameGroup group = new AccNameGroup();
+            group.sourceId = groupCursor.getString(groupCursor.getColumnIndex(ContactsContract.Groups.SOURCE_ID));
+            group.title = groupCursor.getString(groupCursor.getColumnIndex(ContactsContract.Groups.TITLE));
+            group.accountName = groupCursor.getString(groupCursor.getColumnIndex(ContactsContract.Groups.ACCOUNT_NAME));
+            group.summaryCount = groupCursor.getInt(groupCursor.getColumnIndex(ContactsContract.Groups.SUMMARY_COUNT));
+            group.notes = groupCursor.getString(groupCursor.getColumnIndex(ContactsContract.Groups.NOTES));
+            group.isVisible = groupCursor.getInt(groupCursor.getColumnIndex(ContactsContract.Groups.GROUP_VISIBLE)) == 0;
+            group.isDeleted = groupCursor.getInt(groupCursor.getColumnIndex(ContactsContract.Groups.DELETED)) == 1;
+            group.shouldSync = groupCursor.getInt(groupCursor.getColumnIndex(ContactsContract.Groups.SHOULD_SYNC)) == 1;
+            group.readOnly = groupCursor.getInt(groupCursor.getColumnIndex(ContactsContract.Groups.GROUP_IS_READ_ONLY)) == 1;
+            if (group.sourceId != null) {
+                accNameGroups.add(group);
+            }
+        }
+        groupCursor.close();
+        List<String> uniqueSourceId = new ArrayList<>();
+        List<QbixGroup> finalGroups = new ArrayList<>();
+        for (int i = 0; i < accNameGroups.size(); i++) {
+            AccNameGroup accNameGroup = accNameGroups.get(i);
+            if (!uniqueSourceId.contains(accNameGroup.sourceId)) {
+                GetRealGroup:
+                {
+                    for (int j = 0; j < accounts.length; j++) {
+                        if (accNameGroup.accountName.equals(accounts[j].name)) {
+                            for (int k = 0; k < accNameGroups.size(); k++) {
+                                AccNameGroup realGroup = accNameGroups.get(k);
+                                if (realGroup.sourceId.equals(accNameGroup.sourceId) && realGroup.accountName.equals(accNameGroup.accountName)) {
+                                    realGroup.contactIds = GroupHelper.getContactIds(rawIdContactIdPair,
+                                            GroupHelper.getRawIdsBySourceId(app.getActivity(), realGroup.sourceId));
+                                    finalGroups.add(realGroup);
+                                    uniqueSourceId.add(realGroup.sourceId);
+                                    break GetRealGroup;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return finalGroups;
+    }
 }
