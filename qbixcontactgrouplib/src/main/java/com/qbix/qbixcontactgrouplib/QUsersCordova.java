@@ -77,7 +77,7 @@ public class QUsersCordova extends CordovaPlugin {
      */
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
 
-        this.callbackContext = callbackContext;
+        QUsersCordova.this.callbackContext = callbackContext;
         this.executeArgs = args;
         /**
          * Check to see if we are on an Android 1.X device.  If we are return an error as we
@@ -104,16 +104,11 @@ public class QUsersCordova extends CordovaPlugin {
             }
 
             return true;
-        } else if (action.equals(GET_ONE_OR_MORE_LABELS_ACTION)) {
+        }else if(action.equals(GET_ONE_OR_MORE_LABELS_ACTION)){
             if (PermissionHelper.hasPermission(this, READ)) {
                 this.cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
-                        try {
                             getLabels(executeArgs);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
-                        }
                     }
                 });
             } else {
@@ -123,12 +118,7 @@ public class QUsersCordova extends CordovaPlugin {
             if (PermissionHelper.hasPermission(this, WRITE)) {
                 this.cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
-                        try {
-                            removeContactFromLabel(executeArgs);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
-                        }
+                        removeContactFromLabel(executeArgs);
                     }
                 });
             } else {
@@ -138,13 +128,8 @@ public class QUsersCordova extends CordovaPlugin {
         } else if (action.equals(ADD_CONTACT_TO_LABEL_ACTION)) {
             if (PermissionHelper.hasPermission(this, WRITE)) {
                 this.cordova.getThreadPool().execute(new Runnable() {
-                    public void run() {
-                        try {
+                    public void run() {                  
                             addContactToLabel(executeArgs);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
-                        }
                     }
                 });
             } else {
@@ -168,12 +153,11 @@ public class QUsersCordova extends CordovaPlugin {
 
     /**
      * Gets all labels asynchronously and set result to callback context's as success.
-     *
      */
     private void getLabels() {
         this.cordova.getThreadPool().execute(new Runnable() {
             public void run() {
-                List<QbixGroup> labels = groupAccessor.getAllLabels(this.cordova);
+                List<QbixGroup> labels = groupAccessor.getAllLabels();
                 JSONArray jsonGroups = new JSONArray();
                 for (QbixGroup group :
                         labels) {
@@ -300,7 +284,7 @@ public class QUsersCordova extends CordovaPlugin {
                                           int[] grantResults) {
         for (int r : grantResults) {
             if (r == PackageManager.PERMISSION_DENIED) {
-                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+                QUsersCordova.this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
                 return;
             }
         }
@@ -311,12 +295,7 @@ public class QUsersCordova extends CordovaPlugin {
             case REMOVE_CONTACT_FROM_LABEL_REQ_CODE:
                 this.cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
-                        try {
                             removeContactFromLabel(executeArgs);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
-                        }
                     }
                 });
                 break;
@@ -330,12 +309,7 @@ public class QUsersCordova extends CordovaPlugin {
             case LABELS_BY_SOURCE_ID_REQ_CODE:
                 this.cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
-                        try {
                             getLabels(executeArgs);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, e.getMessage()));
-                        }
                     }
                 });
                 break;
@@ -349,7 +323,7 @@ public class QUsersCordova extends CordovaPlugin {
      * because picking a contact doesn't take in any arguments.
      */
     public void onRestoreStateForActivityResult(Bundle state, CallbackContext callbackContext) {
-        this.callbackContext = callbackContext;
+        QUsersCordova.this.callbackContext = callbackContext;
         this.groupAccessor = new GroupAccessor(this.cordova);
     }
 }

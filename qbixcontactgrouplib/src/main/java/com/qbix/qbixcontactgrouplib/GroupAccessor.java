@@ -11,6 +11,8 @@ import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.util.Log;
 
+import org.apache.cordova.CordovaInterface;
+
 import com.qbix.qbixcontactgrouplib.models.AccNameGroup;
 import com.qbix.qbixcontactgrouplib.models.QbixGroup;
 import com.qbix.qbixcontactgrouplib.models.RawIdLabelId;
@@ -34,8 +36,6 @@ public class GroupAccessor {
 
     /**
      * Gets all available groups for users.
-     * It will not get any system related labels
-     * (such as "Starred in Android" or "My Contacts") and labels that are marked for deletion.
      *
      * @return list of {@link QbixGroup} POJO
      */
@@ -198,7 +198,7 @@ public class GroupAccessor {
             }
         } catch (RemoteException e) {
             e.printStackTrace();
-            return e.getMessage()
+            return e.getMessage();
         } catch (OperationApplicationException e) {
             e.printStackTrace();
             return e.getMessage();
@@ -304,4 +304,5 @@ public class GroupAccessor {
 
         return finalGroups;
     }
+
 }

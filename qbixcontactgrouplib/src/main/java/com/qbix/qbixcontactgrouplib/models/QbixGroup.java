@@ -29,9 +29,7 @@ public class QbixGroup {
             jsonGroup.put("readOnly", readOnly);
             JSONArray jsonContactIds = new JSONArray();
             for (int i = 0; i <contactIds.size(); i++) {
-                JSONObject contactId = new JSONObject();
-                contactId.put("contactId",contactIds.get(i));
-                jsonContactIds.put(contactId);
+                jsonContactIds.put(contactIds.get(i));
             }
             jsonGroup.put("contactIds",jsonContactIds);
             return jsonGroup;
